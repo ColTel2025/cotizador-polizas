@@ -1,12 +1,490 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cotizador de Pólizas</title>
-  <script src="./xlsx.full.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cotizador Polizas Coltel</title>
+  <style>
+    :root{
+      --bg1: #00a9e0;
+      --bg2: #007bbd;
+      --card-bg: rgba(255,255,255,0.95);
+      --accent: #ffb86b;
+      --muted: #7a8aa3;
+      --text: #0b1430;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      min-height:100vh;
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      color:var(--text);
+      display:flex;
+      flex-direction:column;
+    }
+
+    .wrap{ flex:1; max-width:1100px; margin:40px auto; padding:28px; }
+
+    .hero{
+      text-align:center; color:white; padding:48px 24px; border-radius:14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25); backdrop-filter: blur(6px);
+      animation: fadeIn 1s ease-in-out;
+    }
+    .hero h1{ margin:0; font-size:34px; letter-spacing:-0.5px; }
+    .hero p{ margin:12px auto 0; color: rgba(255,255,255,0.85); max-width:760px; font-size:16px; }
+
+    .cards{ display:flex; gap:24px; justify-content:center; margin-top:28px; flex-wrap:wrap; }
+    .card{
+      width:300px; min-height:150px; background: var(--card-bg); border-radius:14px;
+      padding:22px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+      box-shadow: 0 8px 20px rgba(2,6,23,0.35); cursor:pointer; transition: transform .22s, box-shadow .22s;
+      text-decoration:none; color: #071233; border: 1px solid rgba(11,18,48,0.06);
+      opacity:0; animation: fadeIn 1s ease forwards;
+    }
+    .card:nth-child(1){ animation-delay:0.2s; }
+    .card:nth-child(2){ animation-delay:0.4s; }
+    .card:nth-child(3){ animation-delay:0.6s; }
+    .card:hover{ transform: translateY(-8px) scale(1.02); box-shadow: 0 18px 40px rgba(2,6,23,0.35); }
+
+    .icon{ font-size:34px; background: linear-gradient(90deg,var(--bg2),var(--accent)); color:white;
+      width:60px; height:60px; display:flex; align-items:center; justify-content:center;
+      border-radius:12px; box-shadow: 0 6px 18px rgba(11,18,48,0.18);
+      animation: bounce 2s infinite;
+    }
+    .card h3{ margin:12px 0 6px; font-size:20px; }
+    .card p{ margin:0; color:var(--muted); font-size:14px; }
+
+    .panel{ margin-top:28px; display:none; animation: slideIn .45s ease both; }
+    .panel.active{ display:block; }
+    @keyframes slideIn{ from{opacity:0; transform:translateY(60px)} to{opacity:1; transform:none} }
+    @keyframes bounce{
+      0%,20%,50%,80%,100%{transform:translateY(0)}
+      40%{transform:translateY(-8px)}
+      60%{transform:translateY(-4px)}
+    }
+    @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+
+    footer{
+      text-align:center;
+      background:#003a5d;
+      color:white;
+      padding:16px;
+      font-size:14px;
+    }
+
+    /* --- Formularios --- */
+    .form-card{ background:white; border-radius:12px; padding:18px; box-shadow: 0 10px 28px rgba(2,6,23,0.12); }
+    label{ display:block; margin-top:12px; font-weight:600; color:#1a2a4a }
+    input[type="text"], input[type="date"], input[type="number"]{
+      width:100%; padding:10px 12px; margin-top:8px; border-radius:8px; border:1px solid #dbe6f7; font-size:15px;
+    }
+
+    .nota{
+      background:#e6f7ff;
+      border-left:4px solid var(--bg1);
+      padding:12px;
+      margin:12px 0 20px;
+      font-size:14px;
+      color:#004a63;
+      border-radius:6px;
+    }
+
+    .table-wrap{ overflow-x:auto; overflow-y:visible; margin-top:18px }
+    table{ width:100%; border-collapse:collapse; min-width:900px }
+    th,td{ border:1px solid #e7eef9; padding:10px; text-align:center; font-size:14px; color:#123; }
+    th{ background:#f6fbff; font-weight:700; color:#0b2a56; overflow:visible !important; }
+
+    .back-btn{ display:inline-flex; align-items:center; gap:8px; background:transparent; border:0; color:#0b2a56;
+      cursor:pointer; font-weight:600; margin-bottom:12px; }
+    .btn-main{ padding:10px 16px; border-radius:8px; background:linear-gradient(90deg,var(--bg1),var(--bg2));
+      color:white; border:0; cursor:pointer; }
+    .btn-main:hover{ opacity:0.9 }
+
+    /* --- Porcentaje cell fix --- */
+    .percent-cell{
+      display:flex; align-items:center; justify-content:center; gap:4px;
+    }
+    .percent-cell input{
+      width:60px; padding:4px; text-align:right;
+    }
+    .percent-cell span{
+      font-weight:600; color:#333;
+    }
+
+    /* --- Tooltips --- */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      margin-left: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      color: var(--bg2);
+      z-index: 9999;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 240px;
+      background-color: #003a5d;
+      color: #fff;
+      text-align: left;
+      border-radius: 6px;
+      padding: 10px;
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -120px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 13px;
+      line-height: 1.4;
+      z-index: 9999;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* --- Encabezados flex para íconos --- */
+    .th-flex {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* --- Otras Garantías: lista con íconos --- */
+    .garantia-list{ list-style:none; padding:0; margin:0; }
+    .garantia-item{ display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #f1f6fb; }
+    .garantia-icon{
+      width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+      font-size:18px; color:white; box-shadow: 0 6px 14px rgba(2,6,23,0.08);
+      flex-shrink:0;
+    }
+    /* colores por tipo */
+    .g-build{ background: linear-gradient(135deg,#4b9be6,#2b6fb0); }     /* edificios - azul */
+    .g-rc{ background: linear-gradient(135deg,#6ad29b,#2b9a6b); }        /* responsabilidad - verde */
+    .g-cyber{ background: linear-gradient(135deg,#f7b267,#ff8a3d); }     /* cyber - naranja */
+    .g-trans{ background: linear-gradient(135deg,#8ec5ff,#6aa7ff); }     /* transporte - celeste */
+    .g-prof{ background: linear-gradient(135deg,#c39eff,#8b61d9); }      /* profesional - morado */
+    .g-eo{ background: linear-gradient(135deg,#f18fb4,#e0487a); }        /* E&O - rosa */
+
+    .garantia-text strong{ display:block; margin-bottom:6px; font-size:15px; }
+    .garantia-text p{ margin:0; color:#1a2a4a; line-height:1.45; font-size:14px; }
+  </style>
 </head>
 <body>
-  <h1>Cotizador versión Local</h1>
+  <div class="wrap">
+    <div id="inicio" class="hero">
+      <h1>Herramienta de Cotización Área Seguros ColTel</h1>
+      <p>Calcula fácilmente tus pólizas o la seriedad de la oferta. Selecciona una opción:</p>
+      <div class="cards">
+        <div class="card" onclick="abrirFormulario('polizas')">
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div class="icon">📑</div>
+            <div><h3>Cotizador de Pólizas</h3><p>Calcula primas, IVA y totales.</p></div>
+          </div>
+        </div>
+
+        <div class="card" onclick="abrirFormulario('seriedad')">
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div class="icon">💼</div>
+            <div><h3>Seriedad de la Oferta</h3><p>Calcula tu póliza de seriedad.</p></div>
+          </div>
+        </div>
+
+        <div class="card" onclick="abrirFormulario('otras')">
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div class="icon">📋</div>
+            <div><h3>Otras Garantías</h3><p>Consulta pólizas adicionales.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cotizador de Pólizas -->
+    <div id="panel-polizas" class="panel">
+      <button class="back-btn" onclick="volverInicio()">⬅ Volver</button>
+      <div class="form-card">
+        <h2>Cotizador de Pólizas Contractuales</h2>
+        <div class="nota">
+          📝 Este cotizador te ayuda a calcular de forma rápida y sencilla un estimado de las garantías contractuales para los contratos adjudicados a ColTel.
+        </div>
+
+        <label>
+          Valor del Contrato con IVA
+          <span class="tooltip">ℹ️
+            <span class="tooltiptext">Ejemplo: Para este campo, ingresa el valor total del contrato en pesos colombianos.</span>
+          </span>
+        </label>
+        <input type="text" id="valorContrato" oninput="formatearValorContrato()" />
+
+        <label>Fecha Inicio de Contrato</label>
+        <input type="date" id="fechaInicio" />
+
+        <label>Fecha Fin de Contrato</label>
+        <input type="date" id="fechaFin" />
+
+        <button class="btn-main" onclick="calcularCotizacion()">Calcular</button>
+
+        <div class="table-wrap">
+          <table id="tablaResultados">
+            <thead>
+              <tr>
+                <th>Garantías o Coberturas</th>
+                <th>
+                  <div class="th-flex">% Sobre contrato
+                  </div>
+                </th>
+                <th>Valor Asegurado</th>
+                <th>Días Contrato</th>
+                <th>
+                  <div class="th-flex">Días Adición Garantia o Cobertura
+                  </div>
+                </th>
+                <th>Total Días Cobertura</th>
+                <th>Tasa</th>
+                <th>Prima sin IVA</th>
+                <th>IVA</th>
+                <th>Total a Pagar</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seriedad de la Oferta -->
+    <div id="panel-seriedad" class="panel">
+      <button class="back-btn" onclick="volverInicio()">⬅ Volver</button>
+      <div class="form-card" style="max-width:720px">
+        <h2>Póliza Seriedad de la Oferta</h2>
+        <div class="nota">
+          📌 ¿Vas a presentar una oferta? Este formulario te permite calcular el valor estimado de la garantía de seriedad de la oferta.
+        </div>
+
+        <label>Valor total de la oferta (COP)</label>
+        <input type="text" id="seriedadValorOferta" oninput="seriedadFormatearNumero(this)">
+
+        <label>
+          <div class="th-flex">
+            Porcentaje de cobertura (%)
+            <span class="tooltip">ℹ️
+              <span class="tooltiptext">Porcentaje del valor de la oferta que debe estar cubierto por la póliza de seriedad.</span>
+            </span>
+          </div>
+        </label>
+        <input type="text" id="seriedadPorcentajeCobertura" oninput="seriedadFormatearPorcentaje(this)">
+
+        <label>
+          <div class="th-flex">
+            Días de vigencia
+            <span class="tooltip">ℹ️
+              <span class="tooltiptext">Indica cuántos días debe estar vigente la póliza de seriedad de la oferta.</span>
+            </span>
+          </div>
+        </label>
+        <input type="text" id="seriedadDiasVigencia" oninput="seriedadSoloNumeros(this)">
+
+        <label>% Tasa (diaria):</label>
+        <input type="text" id="seriedadTasaDiaria" readonly>
+
+        <button class="btn-main" onclick="calcularCotizacionSeriedad()">Calcular</button>
+        <div class="resultado" id="seriedadResultadoCotizacion" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <!-- Otras Garantías (informativo con íconos) -->
+    <div id="panel-otras" class="panel">
+      <button class="back-btn" onclick="volverInicio()">⬅ Volver</button>
+      <div class="form-card" style="max-width:820px">
+        <h2>Otras Garantías</h2>
+        <div class="nota">
+          ⚠️ Estas son algunas de las pólizas adicionales que pueden ser requeridas en los contratos.
+          En caso de que alguna se incluya en la Cláusula de Garantías, el área comercial deberá verificar
+          con el cliente la obligatoriedad y gestionar la entrega del 📄 Certificado de Cobertura expedido
+          por la aseguradora, como soporte formal del cumplimiento de dicha obligación.
+        </div>
+
+        <ul class="garantia-list">
+          <li class="garantia-item">
+            <span class="garantia-icon g-build" aria-hidden="true">🏢</span>
+            <div class="garantia-text">
+              <strong>Todo Riesgo Daños Materiales</strong>
+              <p>Cobertura para pérdidas o daños físicos a bienes inmuebles, maquinaria, equipos y mobiliario, causados por eventos accidentales como incendio, robo, explosión o fenómenos naturales.</p>
+            </div>
+          </li>
+
+          <li class="garantia-item">
+            <span class="garantia-icon g-rc" aria-hidden="true">⚖️</span>
+            <div class="garantia-text">
+              <strong>Responsabilidad Civil Extracontractual</strong>
+              <p>Ampara al asegurado frente a reclamaciones de terceros por daños materiales, personales o patrimoniales causados involuntariamente durante el desarrollo de sus actividades.</p>
+            </div>
+          </li>
+
+          <li class="garantia-item">
+            <span class="garantia-icon g-cyber" aria-hidden="true">💻</span>
+            <div class="garantia-text">
+              <strong>Cyber (Seguridad Cibernética)</strong>
+              <p>Cubre incidentes relacionados con seguridad informática, como robo de datos, ataques cibernéticos, pérdida de información y gastos asociados a la gestión del evento.</p>
+            </div>
+          </li>
+
+          <li class="garantia-item">
+            <span class="garantia-icon g-trans" aria-hidden="true">🚚</span>
+            <div class="garantia-text">
+              <strong>Transporte de Mercancías</strong>
+              <p>Cubre los riesgos asociados al traslado de mercancías por vía terrestre, aérea o marítima. Protege contra pérdidas o daños causados por accidentes, robos, incendios, volcamiento del vehículo, caída de carga, entre otros eventos durante el trayecto.</p>
+            </div>
+          </li>
+
+          <li class="garantia-item">
+            <span class="garantia-icon g-prof" aria-hidden="true">👨‍⚕️</span>
+            <div class="garantia-text">
+              <strong>Responsabilidad Civil Profesional</strong>
+              <p>Cubre errores, omisiones o negligencias cometidas por profesionales en el ejercicio de sus funciones, que generen perjuicios a terceros.</p>
+            </div>
+          </li>
+
+          <li class="garantia-item">
+            <span class="garantia-icon g-eo" aria-hidden="true">📝</span>
+            <div class="garantia-text">
+              <strong>Errores y Omisiones (E&amp;O)</strong>
+              <p>Protección para empresas que prestan servicios o asesorías, frente a reclamaciones por fallas involuntarias en la ejecución de actividades contractuales.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Área: Tesorería / Seguros <br>
+    Contacto: Angie Mayro Ramirez Leal /
+    <a href="mailto:angie.ramirezleal@telefonica.com" style="color:#fff; text-decoration:underline;">angie.ramirezleal@telefonica.com</a>
+  </footer>
+
+  <script>
+    /* -------- Navegación entre paneles -------- */
+    function abrirFormulario(which){
+      document.getElementById('inicio').style.display='none';
+      document.getElementById('panel-polizas')?.classList.remove('active');
+      document.getElementById('panel-seriedad')?.classList.remove('active');
+      document.getElementById('panel-otras')?.classList.remove('active');
+
+      if(which==='polizas') document.getElementById('panel-polizas').classList.add('active');
+      else if(which==='seriedad') document.getElementById('panel-seriedad').classList.add('active');
+      else if(which==='otras') document.getElementById('panel-otras').classList.add('active');
+    }
+    function volverInicio(){
+      document.getElementById('inicio').style.display='block';
+      document.getElementById('panel-polizas')?.classList.remove('active');
+      document.getElementById('panel-seriedad')?.classList.remove('active');
+      document.getElementById('panel-otras')?.classList.remove('active');
+    }
+
+    /* ---- Cotizador de Pólizas ---- */
+    const garantias=[{nombre:"Cumplimiento de Contrato",tasa:0.0025},{nombre:"Calidad Servio o bien",tasa:0.0025},{nombre:"Pagao Salarios Prestaciones",tasa:0.0025},{nombre:"Estabilidad Servio o Obra",tasa:0.0025},{nombre:"Responsabilidad Civil Extracontractual",tasa:0.003}];
+
+    function formatearValorContrato(){
+      const i=document.getElementById("valorContrato");
+      let v=i.value.replace(/\D/g,"");
+      if(v) i.value=new Intl.NumberFormat("es-CO").format(v);
+    }
+
+    function obtenerValorContrato(){
+      const v=document.getElementById("valorContrato").value || "";
+      // Quitar puntos y comas
+      return parseFloat(v.replace(/\./g,"").replace(/,/g,""))||0;
+    }
+
+    function formatNumber(n){ return new Intl.NumberFormat("es-CO").format(Math.round(n)); }
+
+    function calcularCotizacion(){
+      const val=obtenerValorContrato();
+      const f1=document.getElementById('fechaInicio').value, f2=document.getElementById('fechaFin').value;
+      let dias=0; if(f1&&f2) dias=(new Date(f2)-new Date(f1))/(1000*60*60*24);
+      const tbody=document.querySelector("#tablaResultados tbody"); tbody.innerHTML="";
+      garantias.forEach((g,i)=>{
+        const row=`<tr>
+          <td>${g.nombre}</td>
+          <td><div class="percent-cell"><input type='number' id='porcentaje-${i}' placeholder='Ejp: 10' oninput='actualizarCotizacion()' style='width:80px'><span>%</span></div></td>
+          <td id='valorAsegurado-${i}'>0</td>
+          <td>${Math.round(dias)}</td>
+          <td><input type='number' id='diasAdicion-${i}' value='0' oninput='actualizarCotizacion()' style='width:80px'></td>
+          <td id='totalDias-${i}'>${Math.round(dias)}</td>
+          <td>${(g.tasa*100).toFixed(2)}%</td>
+          <td id='prima-${i}'>0</td>
+          <td id='iva-${i}'>0</td>
+          <td id='total-${i}'>0</td>
+        </tr>`;
+        tbody.innerHTML+=row;
+      });
+      tbody.innerHTML+=`<tr style="font-weight:bold;background:#e9fff0"><td colspan="7">Total</td><td id='totalPrima'>0</td><td id='totalIVA'>0</td><td id='totalPagar'>0</td></tr>`;
+    }
+
+    function actualizarCotizacion(){
+      const val=obtenerValorContrato();
+      const f1=document.getElementById('fechaInicio').value, f2=document.getElementById('fechaFin').value;
+      let dias=0; if(f1&&f2) dias=(new Date(f2)-new Date(f1))/(1000*60*60*24);
+      let tP=0,tI=0,tT=0;
+      garantias.forEach((g,i)=>{
+        const pEl=document.getElementById(`porcentaje-${i}`), dEl=document.getElementById(`diasAdicion-${i}`);
+        if(!pEl||!dEl) return;
+        const p=(parseFloat(pEl.value)||0)/100;
+        const dAd=parseInt(dEl.value)||0;
+        const totD=dias+dAd;
+        const vA=val*p;
+        const pri=vA*g.tasa*(totD/365); // prima proporcional al tiempo
+        const iva=pri*0.19;
+        const tot=pri+iva;
+        document.getElementById(`valorAsegurado-${i}`).textContent=formatNumber(vA);
+        document.getElementById(`totalDias-${i}`).textContent=Math.round(totD);
+        document.getElementById(`prima-${i}`).textContent=formatNumber(pri);
+        document.getElementById(`iva-${i}`).textContent=formatNumber(iva);
+        document.getElementById(`total-${i}`).textContent=formatNumber(tot);
+        tP+=pri; tI+=iva; tT+=tot;
+      });
+      document.getElementById('totalPrima').textContent=formatNumber(tP);
+      document.getElementById('totalIVA').textContent=formatNumber(tI);
+      document.getElementById('totalPagar').textContent=formatNumber(tT);
+    }
+
+    /* ---- Seriedad de la Oferta ---- */
+    const seriedadTasaConfigurada=0.0015; // tasa base (ej. 0.15%)
+    document.addEventListener('DOMContentLoaded',()=>{
+      // Mostrar tasa en campo (formato porcentaje con coma decimal)
+      document.getElementById('seriedadTasaDiaria').value=(seriedadTasaConfigurada*100).toFixed(4).replace('.',',');
+    });
+
+    function seriedadFormatearNumero(i){ let v=i.value.replace(/\D/g,''); if(v) i.value=parseFloat(v).toLocaleString('es-CO'); }
+    function seriedadFormatearPorcentaje(i){ i.value=i.value.replace(/[^\d.,]/g,'').replace(',', '.'); }
+    function seriedadSoloNumeros(i){ i.value=i.value.replace(/\D/g,''); }
+    function seriedadLimpiarFormato(v){ return parseFloat((v||"").toString().replace(/\./g,'').replace(',', '.')) || 0; }
+
+    function calcularCotizacionSeriedad(){
+      const val = seriedadLimpiarFormato(document.getElementById('seriedadValorOferta').value);
+      const pc = parseFloat((document.getElementById('seriedadPorcentajeCobertura').value||'0').toString().replace(',', '.'))/100;
+      const d = parseFloat(document.getElementById('seriedadDiasVigencia').value) || 0;
+      if(isNaN(val) || isNaN(pc) || isNaN(d) || val<=0 || pc<=0 || d<=0){
+        document.getElementById('seriedadResultadoCotizacion').innerHTML = "⚠️ Completa correctamente todos los campos (valor, % cobertura y días).";
+        return;
+      }
+      const vA = val * pc;
+      // Prima = Valor Asegurado * tasa diaria * (días / 365)   --> si la tasa es anual / o usar tasa diaria * días si lo prefieres.
+      // Aquí asumimos seriedadTasaConfigurada es **tasa anual** para consistencia con otros cálculos (ajústalo si quieres tasa diaria).
+      const pri = Math.round(vA * seriedadTasaConfigurada * (d / 365));
+      const iva = Math.round(pri * 0.19);
+      const tot = pri + iva;
+      document.getElementById('seriedadResultadoCotizacion').innerHTML =
+        `Valor Asegurado: $${Math.round(vA).toLocaleString('es-CO')}<br>` +
+        `Prima sin IVA: $${pri.toLocaleString('es-CO')}<br>` +
+        `IVA (19%): $${iva.toLocaleString('es-CO')}<br>` +
+        `<strong>Total a Pagar: $${tot.toLocaleString('es-CO')}</strong>`;
+    }
+  </script>
 </body>
 </html>
